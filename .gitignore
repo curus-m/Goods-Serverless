@@ -2,3 +2,4 @@ accessKey.txt
 ./hello-serverless
 ./node_modules/
 /node_modules
+goods-serverless/src/data.json
