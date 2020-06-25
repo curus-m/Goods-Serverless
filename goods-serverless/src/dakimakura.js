@@ -12,7 +12,7 @@ const createResponse = (status, body) => ({
     "body": JSON.stringify(body)
  });
 
- const checkData  = function(data) {
+const checkData  = function(data) {
     const errors = [];
 
     if(!data.name) {
@@ -33,6 +33,36 @@ const createResponse = (status, body) => ({
 
     return errors.length > 0 ? false : true;
 }
+const uploadFile = function (file) {
+    let filename = yyyymmddhhmmss(date);
+    console.log(`filename : ${filename}`);
+    const s3 = new AWS.S3({region: 'ap-northeast-1'});
+    const uploadParams = {Bucket: 'resources/dakimakura/', Key: filename, Body: file};
+    s3.upload (uploadParams, function (err, data) {
+        if (err) {
+            console.log("Error", err);
+            throw Error(err);
+        } 
+        if (data) {
+            console.log("Upload Success", data.Location);
+        }
+    });
+    return filename;
+}
+
+const deleteFile = function(filename) {
+    const s3 = new AWS.S3({region: 'ap-northeast-1'});
+    const params = {Bucket: 'resources/dakimakura/', Key: filename};
+    s3.deleteObject (uploadParams, function (err, data) {
+        if (err) {
+            console.log("Error", err);
+            throw Error(err);
+        } 
+        if (data) {
+            console.log("Upload Success", data.Location);
+        }
+    });
+}
  const yyyymmddhhmmss = function(date) {
     var yyyy = date.getFullYear();
     var mm = date.getMonth() < 9 ? "0" + (date.getMonth() + 1) : (date.getMonth() + 1); // getMonth() is zero-based
@@ -41,7 +71,7 @@ const createResponse = (status, body) => ({
     var min = date.getMinutes() < 10 ? "0" + date.getMinutes() : date.getMinutes();
     var ss = date.getSeconds() < 10 ? "0" + date.getSeconds() : date.getSeconds();
     return "".concat(yyyy).concat(mm).concat(dd).concat(hh).concat(min).concat(ss);
-   };
+};
  
 exports.create = (event, ctx, callback) => {
     const data = event.body.data;
@@ -57,26 +87,14 @@ exports.create = (event, ctx, callback) => {
         const client = await pool.connect()
         const query = queries.addDakimakura
         const date = new Date();
-        let fileName;
+        let filename;
         try {
             if (file) { 
-                fileName = yyyymmddhhmmss(date);
-                console.log(`fileName : ${fileName}`);
-                const s3 = new AWS.S3({region: 'ap-northeast-1'});
-                const uploadParams = {Bucket: 'resources/dakimakura/', Key: 'fileName', Body: file};
-                s3.upload (uploadParams, function (err, data) {
-                    if (err) {
-                        console.log("Error", err);
-                        throw Error(err);
-                    } 
-                    if (data) {
-                        console.log("Upload Success", data.Location);
-                    }
-                });
+                filename = uploadFile(file)
             } else { 
-                fileName = "noimage.jpg";
+                filename = "noimage.jpg";
             }
-            const param = [data.name, data.brand, data.price, data.releaseDate, data.material, fileName]
+            const param = [data.name, data.brand, data.price, data.releasedate, data.material, filename]
             const res = await client.query(query,param)
             console.log("Successfully added");
             callback(null, createResponse(200, { message: 'OK' }))            
@@ -117,18 +135,31 @@ exports.getItem = (event, ctx, callback) => {
   
 exports.update = (event, ctx, callback) => {
     const data = event.body.data;
-    (async (data) => {
-        const client = await pool.connect()
-        const query = queries.updateDakimakura
-        const param = [data.id, data.name, data.brand, data.price, data.material, data.releaseDate]
+    const file = event.body.file;
+    const isOk = checkData(data);
+    if(!isOk) {
+        callback(null, createResponse(404, { message: 'Invalid Data!' }));
+    }
+    console.log("Data OK!");
+    (async (data,file) => {
+        const client = await pool.connect();
+        const date = new Date();
+        let filename = data.image;
         try {
+            if (file) {
+                deleteFile(filename);
+                filename = uploadFile(file)
+            }
+            const query = queries.updateDakimakura;
+            const param = [data.id, data.name, data.brand, data.price, data.material, data.releasedate, data.image];
             const res = await client.query(query,param)
             console.log("Update Complete")
             callback(null, createResponse(200, { message: 'OK' }))            
         } finally {
             client.release()
         }
-    })(data).catch(err => console.log(err.stack));
+    })(data, file).catch(err => console.log(err.stack));    
+   
 
 };
   
