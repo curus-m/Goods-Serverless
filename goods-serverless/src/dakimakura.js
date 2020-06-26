@@ -118,7 +118,8 @@ exports.getList = (event, ctx, callback) =>  {
 };
   
 exports.getItem = (event, ctx, callback) => {
-    const no = event.pathParameters.id
+    const no = event.pathParameters.id;
+    
     (async (no) => {
         const client = await pool.connect()
         const query = queries.getDakiItem
