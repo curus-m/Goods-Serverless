@@ -180,3 +180,15 @@ exports.delete = (event, ctx, callback) => {
     })(no).catch(err => console.log(err.stack));
 };
 
+exports.getMaterials = (event, ctx, callback) => {
+    (async () => {
+        const client = await pool.connect()
+        const query = queries.getMaterialList;
+        try {
+            const res = await client.query(query);
+            callback(null, createResponse(200, res.rows));
+        } finally {
+            client.release()
+        }
+    })().catch(err => console.log(err.stack));
+}
