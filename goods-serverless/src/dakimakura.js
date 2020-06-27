@@ -86,7 +86,6 @@ exports.create = (event, ctx, callback) => {
     (async (data,file) => {
         const client = await pool.connect()
         const query = queries.addDakimakura
-        const date = new Date();
         let filename;
         try {
             if (file) { 
@@ -135,7 +134,7 @@ exports.getItem = (event, ctx, callback) => {
 };
   
 exports.update = (event, ctx, callback) => {
-    const data = event.body.data;
+    const data =  JSON.parse(event.body.data);
     const file = event.body.file;
     const isOk = checkData(data);
     if(!isOk) {

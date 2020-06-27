@@ -11,5 +11,5 @@ module.exports = {
     deleteDakimakura: "delete from dakimakura where id = $1",
     updateDakimakura: `update dakimakura set name=$2, brand=$3, price=$4, material=$5,
                       releaseDate=$6, image= $7 where id=$1`,
-    getMaterialList: `select name, value from material order by value`
+    getMaterialList: `select name as text, value from material order by value`
   }
