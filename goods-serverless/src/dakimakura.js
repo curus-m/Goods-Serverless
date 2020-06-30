@@ -1,7 +1,10 @@
-const AWS = require('aws-sdk');
+/* global AWS */
+
 const { Pool } = require('pg')
 const queries = require('./queries.js')
 const pool = new Pool()
+const multipart = require('parse-multipart')
+
 const createResponse = (status, body) => ({
     "isBase64Encoded": false,
     "headers": {
@@ -34,6 +37,7 @@ const checkData  = function(data) {
     return errors.length > 0 ? false : true;
 }
 const uploadFile = function (file) {
+    const date = new Date();
     let filename = yyyymmddhhmmss(date);
     console.log(`filename : ${filename}`);
     const s3 = new AWS.S3({region: 'ap-northeast-1'});
@@ -53,7 +57,7 @@ const uploadFile = function (file) {
 const deleteFile = function(filename) {
     const s3 = new AWS.S3({region: 'ap-northeast-1'});
     const params = {Bucket: 'resources/dakimakura/', Key: filename};
-    s3.deleteObject (uploadParams, function (err, data) {
+    s3.deleteObject (params, function (err, data) {
         if (err) {
             console.log("Error", err);
             throw Error(err);
@@ -74,6 +78,16 @@ const deleteFile = function(filename) {
 };
  
 exports.create = (event, ctx, callback) => {
+    
+    var boundary = multipart.getBoundary((event.headers['content-type']));
+    console.log("boundary : " +boundary);
+    
+    const parts = multipart.Parse(event.body,boundary);
+    console.log("parts: "+parts);
+    console.log("data: "+event.body.data);
+    console.log("data: "+event.body.file);
+    console.log("body : " +event.body);
+    
     const data = event.body.data;
     const isOk = checkData(data);
 

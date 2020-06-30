@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/curus-m/Goods-Serverless#readme",
   "dependencies": {
-    "aws-sdk": "^2.703.0",
+    "parse-multipart": "^1.0.4",
     "pg": "^8.2.1"
   }
 }
