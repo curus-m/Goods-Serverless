@@ -40,7 +40,7 @@ const changeFile = function (oldFileName) {
     const date = new Date();
 
     let newFilename = yyyymmddhhmmss(date);
-    console.log(`filename : ${filename}`);
+    console.log(`filename : ${newFilename}`);
     const s3 = new AWS.S3({region: 'ap-northeast-1'});
     // const uploadParams = {Bucket: 'resources/dakimakura/', Key: filename, Body: file};
     s3.copyObject()
@@ -48,7 +48,7 @@ const changeFile = function (oldFileName) {
     s3.deleteObject();
 
     
-    return filename;
+    return newFilename;
 }
 
 const deleteFile = function(filename) {
