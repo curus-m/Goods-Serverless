@@ -75,24 +75,23 @@ const deleteFile = function(filename) {
 };
  
 exports.create = (event, ctx, callback) => {
-    const data = Buffer.from(event.body, 'base64').toString('ascii');
-    console.log(data);
-    const boundary = multipart.getBoundary((event.headers['content-type']));
-    console.log("boundary : " +boundary);
-    const result = await parser.parse(event);
-    const myData = result.data;
-
-    console.log(myData);
-    
-    const isOk = checkData(myData);
+      // const data = Buffer.from(event.body, 'base64').toString('ascii');
+    // console.log(data);
+    (async () => {
+        // console.log(event.body);
+        const result = await parser.parse(event);
+        console.log(result);
+        const myData = result.data;
+        console.log(myData);
+        const isOk = checkData(myData);
+        if(!isOk) {
+            callback(null, createResponse(404, { message: 'Invalid Data!' }));
+        }
+        console.log("Data OK!")
+        // console.log(data);
+        callback(null, createResponse(200, { message: 'Good Data!' }));
+    })().catch((err) => {console.log(err)});
     // const fileName = data.fileName; // it is original
-
-    if(!isOk) {
-        callback(null, createResponse(404, { message: 'Invalid Data!' }));
-    }
-    console.log("Data OK!")
-    console.log(data);
-    callback(null, createResponse(200, { message: 'Good Data!' }));
 
 /*    (async (data,file) => {
         const client = await pool.connect()
