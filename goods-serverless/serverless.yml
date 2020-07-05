@@ -96,7 +96,12 @@ functions:
       - http:
           path: material
           method: get
-
+  getPreSignedURL:
+    handler: src/dakimakura.getPreSignedURL
+    events:
+      - http: 
+          path: getPreSign
+          method: post
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
 #    Check the event documentation for details

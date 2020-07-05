@@ -1,9 +1,8 @@
-/* global AWS */
-
+const AWS = require('aws-sdk');
 const { Pool } = require('pg')
 const queries = require('./queries.js')
 const pool = new Pool()
-const multipart = require('parse-multipart')
+const parser = require('lambda-multipart-parser');
 
 const createResponse = (status, body) => ({
     "isBase64Encoded": false,
@@ -36,21 +35,19 @@ const checkData  = function(data) {
 
     return errors.length > 0 ? false : true;
 }
-const uploadFile = function (file) {
+// change fileName on s3 
+const changeFile = function (oldFileName) {
     const date = new Date();
-    let filename = yyyymmddhhmmss(date);
+
+    let newFilename = yyyymmddhhmmss(date);
     console.log(`filename : ${filename}`);
     const s3 = new AWS.S3({region: 'ap-northeast-1'});
-    const uploadParams = {Bucket: 'resources/dakimakura/', Key: filename, Body: file};
-    s3.upload (uploadParams, function (err, data) {
-        if (err) {
-            console.log("Error", err);
-            throw Error(err);
-        } 
-        if (data) {
-            console.log("Upload Success", data.Location);
-        }
-    });
+    // const uploadParams = {Bucket: 'resources/dakimakura/', Key: filename, Body: file};
+    s3.copyObject()
+    // (from_bucket, object_key, to_bucket, object_key); 
+    s3.deleteObject();
+
+    
     return filename;
 }
 
@@ -78,32 +75,32 @@ const deleteFile = function(filename) {
 };
  
 exports.create = (event, ctx, callback) => {
-    
-    var boundary = multipart.getBoundary((event.headers['content-type']));
+    const data = Buffer.from(event.body, 'base64').toString('ascii');
+    console.log(data);
+    const boundary = multipart.getBoundary((event.headers['content-type']));
     console.log("boundary : " +boundary);
+    const result = await parser.parse(event);
+    const myData = result.data;
+
+    console.log(myData);
     
-    const parts = multipart.Parse(event.body,boundary);
-    console.log("parts: "+parts);
-    console.log("data: "+event.body.data);
-    console.log("data: "+event.body.file);
-    console.log("body : " +event.body);
-    
-    const data = event.body.data;
-    const isOk = checkData(data);
+    const isOk = checkData(myData);
+    // const fileName = data.fileName; // it is original
 
     if(!isOk) {
         callback(null, createResponse(404, { message: 'Invalid Data!' }));
     }
     console.log("Data OK!")
-    const file = event.body.file;
+    console.log(data);
+    callback(null, createResponse(200, { message: 'Good Data!' }));
 
-    (async (data,file) => {
+/*    (async (data,file) => {
         const client = await pool.connect()
         const query = queries.addDakimakura
         let filename;
         try {
-            if (file) { 
-                filename = uploadFile(file)
+            if (fileName) { 
+                filename = changeFileName(fileName);
             } else { 
                 filename = "noimage.jpg";
             }
@@ -114,7 +111,7 @@ exports.create = (event, ctx, callback) => {
         } finally {
             client.release()
         }
-    })(data,file).catch(err => console.log(err.stack));
+    })(data,file).catch(err => console.log(err.stack)); */
 };
   
 exports.getList = (event, ctx, callback) =>  {
@@ -205,3 +202,25 @@ exports.getMaterials = (event, ctx, callback) => {
         }
     })().catch(err => console.log(err.stack));
 }
+
+exports.getPreSignedURL = function(event, context, callback) {
+    let requestObject = JSON.parse(event["body"]);
+    const s3 = new AWS.S3({region: 'ap-northeast-1'});
+    const fileName = requestObject.fileName;
+    const fileType = requestObject.fileType;
+    const myBucket = 'resource/dakimakura';
+    const param = {
+      Bucket: myBucket,
+      Key: fileName,
+      ContentType: fileType
+    };
+    console.log("param: " + JSON.stringify(param));
+    s3.getSignedUrl('putObject', param , function (err, url) {
+      if (err) {
+          console.log("error: " + err);
+        callback(null, createResponse(500, err));
+      } else {
+        callback(null,createResponse(200, url));    
+      }
+    });
+};
