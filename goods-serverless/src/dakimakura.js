@@ -2,7 +2,14 @@ const AWS = require('aws-sdk');
 const { Pool } = require('pg')
 const queries = require('./queries.js')
 const pool = new Pool()
-const parser = require('lambda-multipart-parser');
+const bucketName = "goods-resources";
+const dakimakuraFolder = "resources/dakimakura/";
+const s3Config = {
+    accessKeyId: process.env.ACCESS_KEY,
+    secretAccessKey: process.env.SECRET_KEY,
+    region: 'ap-northeast-1',
+    signatureVersion: 'v4'
+}
 
 const createResponse = (status, body) => ({
     "isBase64Encoded": false,
@@ -32,23 +39,41 @@ const checkData  = function(data) {
     if (!data.releasedate) {
         errors.push("Date Error");
     }
-
+    console.log("errors:" + errors);
     return errors.length > 0 ? false : true;
 }
 // change fileName on s3 
-const changeFile = function (oldFileName) {
+const changeFileName = function (oldFileName) {
     const date = new Date();
 
-    let newFilename = yyyymmddhhmmss(date);
-    console.log(`filename : ${newFilename}`);
-    const s3 = new AWS.S3({region: 'ap-northeast-1'});
-    // const uploadParams = {Bucket: 'resources/dakimakura/', Key: filename, Body: file};
-    s3.copyObject()
+    let newFileName = yyyymmddhhmmss(date);
+    console.log(`filename : ${newFileName}`);
+    const s3 = new AWS.S3(s3Config);
+    const copyParams = {
+        Bucket: bucketName, 
+        CopySource:  `${dakimakuraFolder}${oldFileName}`,
+        Key: `${dakimakuraFolder}${newFileName}`
+        //resources/dakimakura/20190613222957.jpg
+    }
+    const deleteParams = {
+        Bucket: bucketName, 
+        Key:  `${dakimakuraFolder}${oldFileName}`,
+    }
+    s3.copyObject(copyParams, (err, data) => {
+            if (err) console.log(err, err.stack); // an error occurred
+            else     console.log(data);   
+    })
     // (from_bucket, object_key, to_bucket, object_key); 
-    s3.deleteObject();
-
-    
-    return newFilename;
+    // deleteObject(params = {}, callback) ⇒ AWS.Request 
+    // delete original file
+    s3.deleteObject(deleteParams, (err, data) => {
+        if (err) { 
+            console.log(err, err.stack); // an error occurred
+            return null;
+        }
+        else     console.log(data);   
+    });
+    return newFileName;
 }
 
 const deleteFile = function(filename) {
@@ -75,42 +100,32 @@ const deleteFile = function(filename) {
 };
  
 exports.create = (event, ctx, callback) => {
-      // const data = Buffer.from(event.body, 'base64').toString('ascii');
-    // console.log(data);
-    (async () => {
-        // console.log(event.body);
-        const result = await parser.parse(event);
-        console.log(result);
-        const myData = result.data;
-        console.log(myData);
-        const isOk = checkData(myData);
-        if(!isOk) {
-            callback(null, createResponse(404, { message: 'Invalid Data!' }));
-        }
-        console.log("Data OK!")
-        // console.log(data);
-        callback(null, createResponse(200, { message: 'Good Data!' }));
-    })().catch((err) => {console.log(err)});
-    // const fileName = data.fileName; // it is original
+    const myData = JSON.parse(event.body);
+    const isOk = checkData(myData);
+    if(!isOk) {
+        callback(null, createResponse(404, { message: 'Invalid Data!'}));
+    }
+    console.log(myData);
+    console.log("Data OK!")
 
-/*    (async (data,file) => {
+    (async (myData) => {
         const client = await pool.connect()
         const query = queries.addDakimakura
-        let filename;
+        let filename = ""; // it is original
         try {
-            if (fileName) { 
-                filename = changeFileName(fileName);
+            if (myData.fileName) { 
+                filename = changeFileName(filename);
             } else { 
                 filename = "noimage.jpg";
             }
-            const param = [data.name, data.brand, data.price, data.releasedate, data.material, filename]
+            const param = [myData.name, myData.brand, myData.price, myData.releasedate, myData.material, filename]
             const res = await client.query(query,param)
             console.log("Successfully added");
             callback(null, createResponse(200, { message: 'OK' }))            
         } finally {
             client.release()
         }
-    })(data,file).catch(err => console.log(err.stack)); */
+    })(myData).catch(err => console.log(err.stack));
 };
   
 exports.getList = (event, ctx, callback) =>  {
@@ -157,8 +172,7 @@ exports.update = (event, ctx, callback) => {
         let filename = data.image;
         try {
             if (file) {
-                deleteFile(filename);
-                filename = uploadFile(file)
+                changeFileName(filename);
             }
             const query = queries.updateDakimakura;
             const param = [data.id, data.name, data.brand, data.price, data.material, data.releasedate, data.image];
@@ -203,20 +217,22 @@ exports.getMaterials = (event, ctx, callback) => {
 }
 
 exports.getPreSignedURL = function(event, context, callback) {
-    let requestObject = JSON.parse(event["body"]);
+    let requestObject = event["body"];
     const s3 = new AWS.S3({region: 'ap-northeast-1'});
     const fileName = requestObject.fileName;
     const fileType = requestObject.fileType;
     const myBucket = 'resource/dakimakura';
     const param = {
-      Bucket: myBucket,
-      Key: fileName,
+      Bucket: bucketName,
+      Key: `${dakimakuraFolder}${fileName}`,
       ContentType: fileType
     };
+    console.log("ACCESS_KEY "+process.env.ACCESS_KEY);
+    console.log("SECRET_KEY "+process.env.SECRET_KEY);
     console.log("param: " + JSON.stringify(param));
     s3.getSignedUrl('putObject', param , function (err, url) {
       if (err) {
-          console.log("error: " + err);
+        console.log("error: " + err);
         callback(null, createResponse(500, err));
       } else {
         callback(null,createResponse(200, url));    

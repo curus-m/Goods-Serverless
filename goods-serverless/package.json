@@ -20,7 +20,6 @@
   },
   "homepage": "https://github.com/curus-m/Goods-Serverless#readme",
   "dependencies": {
-    "lambda-multipart-parser": "0.0.2",
     "pg": "^8.2.1"
   }
 }
