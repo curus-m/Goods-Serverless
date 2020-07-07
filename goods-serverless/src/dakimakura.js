@@ -217,18 +217,14 @@ exports.getMaterials = (event, ctx, callback) => {
 }
 
 exports.getPreSignedURL = function(event, context, callback) {
-    let requestObject = event["body"];
-    const s3 = new AWS.S3({region: 'ap-northeast-1'});
+    let requestObject = JSON.parse(event["body"]);
+    const s3 = new AWS.S3(s3Config);
     const fileName = requestObject.fileName;
-    const fileType = requestObject.fileType;
-    const myBucket = 'resource/dakimakura';
     const param = {
       Bucket: bucketName,
       Key: `${dakimakuraFolder}${fileName}`,
-      ContentType: fileType
+      Expires: 600
     };
-    console.log("ACCESS_KEY "+process.env.ACCESS_KEY);
-    console.log("SECRET_KEY "+process.env.SECRET_KEY);
     console.log("param: " + JSON.stringify(param));
     s3.getSignedUrl('putObject', param , function (err, url) {
       if (err) {
