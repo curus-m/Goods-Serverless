@@ -10,6 +10,7 @@ const s3Config = {
     region: 'ap-northeast-1',
     signatureVersion: 'v4'
 }
+const s3 = new AWS.S3(s3Config);
 
 const createResponse = (status, body) => ({
     "isBase64Encoded": false,
@@ -43,49 +44,42 @@ const checkData  = function(data) {
     return errors.length > 0 ? false : true;
 }
 // change fileName on s3 
-const changeFileName = function (oldFileName) {
+const changeFile = async function (oldFileName) {
     const date = new Date();
-
-    let newFileName = yyyymmddhhmmss(date);
-    console.log(`filename : ${newFileName}`);
-    const s3 = new AWS.S3(s3Config);
+    let extension = `${oldFileName.split(".")[1]}`
+    let newFileName = `${yyyymmddhhmmss(date)}.${extension}`;
     const copyParams = {
         Bucket: bucketName, 
-        CopySource:  `${dakimakuraFolder}${oldFileName}`,
-        Key: `${dakimakuraFolder}${newFileName}`
-        //resources/dakimakura/20190613222957.jpg
-    }
-    const deleteParams = {
-        Bucket: bucketName, 
-        Key:  `${dakimakuraFolder}${oldFileName}`,
+        Key: `${dakimakuraFolder}${newFileName}`,
+        CopySource:  `${bucketName}/${dakimakuraFolder}${oldFileName}`,
+        ACL: "public-read"
     }
     s3.copyObject(copyParams, (err, data) => {
-            if (err) console.log(err, err.stack); // an error occurred
-            else     console.log(data);   
+            if (err) { 
+                console.log(err, err.stack); 
+            }   
+            // an error occurred
+            else {
+                console.log("Copy complete");
+            }
     })
-    // (from_bucket, object_key, to_bucket, object_key); 
-    // deleteObject(params = {}, callback) ⇒ AWS.Request 
-    // delete original file
-    s3.deleteObject(deleteParams, (err, data) => {
-        if (err) { 
-            console.log(err, err.stack); // an error occurred
-            return null;
-        }
-        else     console.log(data);   
-    });
     return newFileName;
 }
 
-const deleteFile = function(filename) {
-    const s3 = new AWS.S3({region: 'ap-northeast-1'});
-    const params = {Bucket: 'resources/dakimakura/', Key: filename};
-    s3.deleteObject (params, function (err, data) {
-        if (err) {
-            console.log("Error", err);
+const deleteFile = function(fileName) {
+    const deleteParams = {
+        Bucket: bucketName, 
+        Key:  `${dakimakuraFolder}${fileName}`,
+    }
+    
+    s3.deleteObject(deleteParams, (err, data) => {
+        if (err) { 
+            console.log(err, err.stack); // an error occurred
             throw Error(err);
-        } 
-        if (data) {
-            console.log("Upload Success", data.Location);
+        }
+        else {
+            console.log(data);
+            console.log("delete Complete")
         }
     });
 }
@@ -107,25 +101,32 @@ exports.create = (event, ctx, callback) => {
     }
     console.log(myData);
     console.log("Data OK!")
-
+     
+    let newFilename = changeFile(myData.fileName);
+    
+    console.log("New FileName: " + newFilename);
     (async (myData) => {
         const client = await pool.connect()
         const query = queries.addDakimakura
-        let filename = ""; // it is original
+        let fileName = ""; // it is original
+        let oldFileName = myData.fileName;
         try {
             if (myData.fileName) { 
-                filename = changeFileName(filename);
+                fileName = await changeFileName(myData.fileName);
+                deleteFile(oldFileName);    
             } else { 
-                filename = "noimage.jpg";
+                fileName = "noimage.jpg";
             }
-            const param = [myData.name, myData.brand, myData.price, myData.releasedate, myData.material, filename]
+            const param = [myData.name, myData.brand, myData.price, myData.releasedate, myData.material, fileName]
             const res = await client.query(query,param)
             console.log("Successfully added");
             callback(null, createResponse(200, { message: 'OK' }))            
         } finally {
-            client.release()
+            client.release();
+            
         }
     })(myData).catch(err => console.log(err.stack));
+    
 };
   
 exports.getList = (event, ctx, callback) =>  {
@@ -169,13 +170,13 @@ exports.update = (event, ctx, callback) => {
     (async (data,file) => {
         const client = await pool.connect();
         const date = new Date();
-        let filename = data.image;
+        let fileName = data.image;
         try {
             if (file) {
-                changeFileName(filename);
+                fileName = await changeFile(fileName);
             }
             const query = queries.updateDakimakura;
-            const param = [data.id, data.name, data.brand, data.price, data.material, data.releasedate, data.image];
+            const param = [data.id, data.name, data.brand, data.price, data.material, data.releasedate, fileName];
             const res = await client.query(query,param)
             console.log("Update Complete")
             callback(null, createResponse(200, { message: 'OK' }))            
