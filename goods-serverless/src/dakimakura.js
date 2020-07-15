@@ -100,11 +100,8 @@ exports.create = (event, ctx, callback) => {
         callback(null, createResponse(404, { message: 'Invalid Data!'}));
     }
     console.log(myData);
-    console.log("Data OK!")
+    console.log("Data OK!");
      
-    let newFilename = changeFile(myData.fileName);
-    
-    console.log("New FileName: " + newFilename);
     (async (myData) => {
         const client = await pool.connect()
         const query = queries.addDakimakura
@@ -112,8 +109,7 @@ exports.create = (event, ctx, callback) => {
         let oldFileName = myData.fileName;
         try {
             if (myData.fileName) { 
-                fileName = await changeFileName(myData.fileName);
-                deleteFile(oldFileName);    
+                fileName = await changeFile(myData.fileName);
             } else { 
                 fileName = "noimage.jpg";
             }
@@ -123,9 +119,12 @@ exports.create = (event, ctx, callback) => {
             callback(null, createResponse(200, { message: 'OK' }))            
         } finally {
             client.release();
-            
+            if (oldFileName != "noimage.jpg") { deleteFile(oldFileName);}
         }
-    })(myData).catch(err => console.log(err.stack));
+    })(myData).catch((err) => {
+        console.log(err.stack);
+        callback(null, createResponse(404, { message: 'Invalid Data!'}));
+    });
     
 };
   
@@ -160,32 +159,39 @@ exports.getItem = (event, ctx, callback) => {
 };
   
 exports.update = (event, ctx, callback) => {
-    const data =  JSON.parse(event.body.data);
-    const file = event.body.file;
-    const isOk = checkData(data);
+    const myData = JSON.parse(event.body);
+    const isOk = checkData(myData);
     if(!isOk) {
-        callback(null, createResponse(404, { message: 'Invalid Data!' }));
+        callback(null, createResponse(404, { message: 'Invalid Data!'}));
     }
+    console.log(myData);
     console.log("Data OK!");
-    (async (data,file) => {
-        const client = await pool.connect();
-        const date = new Date();
-        let fileName = data.image;
+   
+    (async (myData) => {
+        const client = await pool.connect()
+        const query = queries.updateDakimakura
+        let fileName = ""; // it is original
+        let oldFileName = myData.fileName;
         try {
-            if (file) {
-                fileName = await changeFile(fileName);
+            if (myData.fileName) { 
+                fileName = await changeFile(myData.fileName);
+            } else { 
+                fileName = "noimage.jpg";
             }
+        
             const query = queries.updateDakimakura;
-            const param = [data.id, data.name, data.brand, data.price, data.material, data.releasedate, fileName];
+            const param = [myData.id, myData.name, myData.brand, myData.price, myData.material, myData.releasedate, fileName];
             const res = await client.query(query,param)
             console.log("Update Complete")
             callback(null, createResponse(200, { message: 'OK' }))            
         } finally {
             client.release()
+            if (oldFileName !=  "noimage.jpg") { deleteFile(oldFileName);}
         }
-    })(data, file).catch(err => console.log(err.stack));    
-   
-
+    })(myData).catch((err) => {
+        console.log(err.stack);
+        callback(null, createResponse(404, { message: 'Invalid Data!'}));
+    });
 };
   
 exports.delete = (event, ctx, callback) => {
