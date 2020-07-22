@@ -16,7 +16,8 @@ const createResponse = (status, body) => ({
     "isBase64Encoded": false,
     "headers": {
         "Content-Type": 'application/json; charset=utf-8', 
-        'Access-Control-Allow-Origin' : '*'
+        'Access-Control-Allow-Origin' : '*',
+        'Access-Control-Allow-Credentials': true
     },
     "statusCode": status,
     "body": JSON.stringify(body)
@@ -169,24 +170,27 @@ exports.update = (event, ctx, callback) => {
    
     (async (myData) => {
         const client = await pool.connect()
-        const query = queries.updateDakimakura
         let fileName = ""; // it is original
         let oldFileName = myData.fileName;
+        let query, param;
         try {
             if (myData.fileName) { 
                 fileName = await changeFile(myData.fileName);
+                // image change 
+                query = queries.updateDakimakura;
+                param = [myData.id, myData.name, myData.brand, myData.price, myData.material, myData.releasedate, fileName];
             } else { 
+                // pass image update
                 fileName = "noimage.jpg";
+                query = queries.updateDakimakuraNoImage;
+                param = [myData.id, myData.name, myData.brand, myData.price, myData.material, myData.releasedate];
             }
-        
-            const query = queries.updateDakimakura;
-            const param = [myData.id, myData.name, myData.brand, myData.price, myData.material, myData.releasedate, fileName];
             const res = await client.query(query,param)
             console.log("Update Complete")
             callback(null, createResponse(200, { message: 'OK' }))            
         } finally {
             client.release()
-            if (oldFileName !=  "noimage.jpg") { deleteFile(oldFileName);}
+            if (myData.fileName) { deleteFile(oldFileName);}
         }
     })(myData).catch((err) => {
         console.log(err.stack);

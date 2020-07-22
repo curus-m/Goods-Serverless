@@ -84,6 +84,7 @@ functions:
       - http:
           path: dakimakura/{id}
           method: put
+          cors: true
   delete:
     handler: src/dakimakura.delete
     events:
