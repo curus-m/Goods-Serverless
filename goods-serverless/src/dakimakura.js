@@ -10,6 +10,7 @@ const s3Config = {
     region: 'ap-northeast-1',
     signatureVersion: 'v4'
 }
+const pageItems = 10;
 const s3 = new AWS.S3(s3Config);
 
 const createResponse = (status, body) => ({
@@ -130,11 +131,27 @@ exports.create = (event, ctx, callback) => {
 };
   
 exports.getList = (event, ctx, callback) =>  {
+    const pages = event.queryStringParameters.page ? event.queryStringParameters.page : 1;
+    let searchQuery = event.queryStringParameters.query ? event.queryStringParameters.query : '';
+    searchQuery = `%${searchQuery}%`;
+    const category = event.queryStringParameters.category ? event.queryStringParameters.category : null;
+    let categoryStart, categoryEnd;
+    if( category == 0 )
+    {
+        categoryStart = 0;
+        categoryEnd = 10;
+    } else {
+        categoryStart = category;
+        categoryEnd = category;
+    }
+    console.log(`page: ${pages} , query: ${searchQuery}, category: ${category}`);
+    let offset = pageItems * pages;
     (async () => {
         const client = await pool.connect()
         const query = queries.getDakiList
+        const param = [searchQuery, categoryStart, categoryEnd, pageItems, offset];
         try {
-            const res = await client.query(query)
+            const res = await client.query(query,param);
             callback(null, createResponse(200, res.rows))
         } finally {
             client.release()
