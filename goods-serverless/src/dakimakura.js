@@ -134,7 +134,7 @@ exports.getList = (event, ctx, callback) =>  {
     const pages = event.queryStringParameters.page ? event.queryStringParameters.page : 1;
     let searchQuery = event.queryStringParameters.query ? event.queryStringParameters.query : '';
     searchQuery = `%${searchQuery}%`;
-    const category = event.queryStringParameters.category ? event.queryStringParameters.category : null;
+    const category = event.queryStringParameters.category ? event.queryStringParameters.category : 0;
     let categoryStart, categoryEnd;
     if( category == 0 )
     {
@@ -145,14 +145,22 @@ exports.getList = (event, ctx, callback) =>  {
         categoryEnd = category;
     }
     console.log(`page: ${pages} , query: ${searchQuery}, category: ${category}`);
-    let offset = pageItems * pages;
+    let offset = pageItems * (pages-1);
     (async () => {
-        const client = await pool.connect()
-        const query = queries.getDakiList
-        const param = [searchQuery, categoryStart, categoryEnd, pageItems, offset];
+        const client = await pool.connect();
+        const dakiListQuery = queries.getDakiList;
+        const dakiListParam = [searchQuery, categoryStart, categoryEnd, pageItems, offset];
+        const dakiCountQuery = queries.getTotalDakimakura;
+        const dakiCountParam = [searchQuery, categoryStart, categoryEnd]
         try {
-            const res = await client.query(query,param);
-            callback(null, createResponse(200, res.rows))
+            const dakiList = await client.query(dakiListQuery, dakiListParam);
+            let count = await client.query(dakiCountQuery, dakiCountParam);
+            count = Math.ceil(count.rows[0].count/pageItems);
+            const data = {
+                dakimakuras: dakiList.rows,
+                totalPages: count
+            }
+            callback(null, createResponse(200, data))
         } finally {
             client.release()
         }
