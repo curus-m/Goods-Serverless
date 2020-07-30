@@ -115,13 +115,19 @@ exports.create = (event, ctx, callback) => {
             } else { 
                 fileName = "noimage.jpg";
             }
-            const param = [myData.name, myData.brand, myData.price, myData.releasedate, myData.material, fileName]
-            const res = await client.query(query,param)
-            console.log("Successfully added");
-            callback(null, createResponse(200, { message: 'OK' }))            
+            const param = [myData.name, myData.brand, myData.price, myData.releasedate, myData.material, myData.description, fileName]
+            client.query(query,param).then((result) => {
+                console.log("Successfully added");
+                if (oldFileName != "noimage.jpg") { deleteFile(oldFileName); }
+                callback(null, createResponse(200, { message: 'OK' }))
+            }, (error) => {
+                console.log("Fail!");
+                if (oldFileName != "noimage.jpg") { deleteFile(oldFileName); }
+            })
+            
         } finally {
             client.release();
-            if (oldFileName != "noimage.jpg") { deleteFile(oldFileName);}
+     
         }
     })(myData).catch((err) => {
         console.log(err.stack);
@@ -203,12 +209,12 @@ exports.update = (event, ctx, callback) => {
                 fileName = await changeFile(myData.fileName);
                 // image change 
                 query = queries.updateDakimakura;
-                param = [myData.id, myData.name, myData.brand, myData.price, myData.material, myData.releasedate, fileName];
+                param = [myData.id, myData.name, myData.brand, myData.price, myData.material, myData.releasedate, myData.description, fileName];
             } else { 
                 // pass image update
                 fileName = "noimage.jpg";
                 query = queries.updateDakimakuraNoImage;
-                param = [myData.id, myData.name, myData.brand, myData.price, myData.material, myData.releasedate];
+                param = [myData.id, myData.name, myData.brand, myData.price, myData.material, myData.releasedate, myData.description];
             }
             const res = await client.query(query,param)
             console.log("Update Complete")
