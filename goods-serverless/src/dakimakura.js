@@ -59,13 +59,15 @@ const changeFile = async function (oldFileName) {
     s3.copyObject(copyParams, (err, data) => {
             if (err) { 
                 console.log(err, err.stack); 
+                Promise.reject(err);
             }   
             // an error occurred
             else {
                 console.log("Copy complete");
+                Promise.resolve(newFileName);
             }
     })
-    return newFileName;
+    
 }
 
 const deleteFile = function(fileName) {
@@ -80,7 +82,6 @@ const deleteFile = function(fileName) {
             throw Error(err);
         }
         else {
-            console.log(data);
             console.log("delete Complete")
         }
     });
@@ -101,7 +102,7 @@ exports.create = (event, ctx, callback) => {
     if(!isOk) {
         callback(null, createResponse(404, { message: 'Invalid Data!'}));
     }
-    console.log(myData);
+    // console.log(myData);
     console.log("Data OK!");
      
     (async (myData) => {
@@ -111,20 +112,32 @@ exports.create = (event, ctx, callback) => {
         let oldFileName = myData.fileName;
         try {
             if (myData.fileName) { 
-                fileName = await changeFile(myData.fileName);
+                fileName = await changeFile(myData.fileName).then((res)=>{
+                    const param = [myData.name, myData.brand, myData.price, myData.releasedate, myData.material, myData.description, fileName]
+                    client.query(query,param).then((result) => {
+                        console.log("Successfully added");
+                        if (oldFileName != "noimage.jpg") { deleteFile(oldFileName); }
+                        callback(null, createResponse(200, { message: 'OK' }))
+                    }, (error) => {
+                        console.log(error);
+                        console.log("Fail!");
+                        if (oldFileName != "noimage.jpg") { deleteFile(oldFileName); }
+                    })
+                }, (error)=>{
+                    console.log(error);
+                    console.log("Fail!");
+                });
             } else { 
                 fileName = "noimage.jpg";
+                const param = [myData.name, myData.brand, myData.price, myData.releasedate, myData.material, myData.description, fileName]
+                client.query(query,param).then((result) => {
+                    console.log(result);
+                    console.log("Successfully added");
+                }, (error) => {
+                    console.log(error);
+                    console.log("Fail!");
+                });
             }
-            const param = [myData.name, myData.brand, myData.price, myData.releasedate, myData.material, myData.description, fileName]
-            client.query(query,param).then((result) => {
-                console.log("Successfully added");
-                if (oldFileName != "noimage.jpg") { deleteFile(oldFileName); }
-                callback(null, createResponse(200, { message: 'OK' }))
-            }, (error) => {
-                console.log("Fail!");
-                if (oldFileName != "noimage.jpg") { deleteFile(oldFileName); }
-            })
-            
         } finally {
             client.release();
      
